@@ -1,0 +1,17 @@
+-----------------------------------------------
+cdg2video: CDG+MP3 to video converter
+Author: Nikolay Nikolov <nknikolov@gmail.com>
+-----------------------------------------------
+
+-----------------------------------------------
+* REQUIREMENTS *
+- ffmpeg shall be installed (libavcodec and libavformat are required)
+- cmake (http://www.cmake.org/) version 2.1 or newer in your PATH
+-----------------------------------------------
+
+-----------------------------------------------
+* Building and running *
+- cmake .
+- make && make install
+-----------------------------------------------
+
