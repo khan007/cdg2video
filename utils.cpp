@@ -87,7 +87,7 @@ char* get_audio_filename(const char* cdgfile)
 int get_frame_rate(int *frame_rate_num, int *frame_rate_den, const char *arg)
 {
     int i = 0;
-    char* cp;
+    const char* cp;
 
     if (frame_rate_num == NULL || frame_rate_den == NULL || arg == NULL)
         return -1;
@@ -159,7 +159,7 @@ int get_frame_size(int *width_ptr, int *height_ptr, const char *str)
 
 int get_aspect_ratio(AVRational *aspect_ratio, const char *arg)
 {
-    char* cp;
+    const char* cp;
 
     if (aspect_ratio == NULL || arg == NULL)
         return -1;
