@@ -70,5 +70,6 @@ SET(CPACK_PACKAGE_VERSION_PATCH "0")
 SET(CPACK_GENERATOR TGZ)
 SET(CPACK_SOURCE_PACKAGE_FILE_NAME "${PACKAGE}-${VERSION}")
 SET(CPACK_SOURCE_GENERATOR TGZ)
-SET(CPACK_SOURCE_IGNORE_FILES ".svn;CMakeFiles;CMakeCache.txt;CPack*;progress.make;cmake_install.cmake;Makefile;config.h$;~$;gz$;kdevelop$;kdevelop.filelist$;kdevelop.pcs$;kdevses$;install_manifest.txt;Doxyfile;${PROJECT_SOURCE_DIR}/${PACKAGE}")
+SET(CPACK_SOURCE_IGNORE_FILES "\\\\.svn;CMakeFiles;CMakeCache.txt;CPack*;progress.make;cmake_install.cmake;Makefile;config.h$;~$;gz$;kdevelop$;kdevelop.filelist$;kdevelop.pcs$;kdevses$;install_manifest.txt;Doxyfile;${PROJECT_SOURCE_DIR}/${PACKAGE}")
 INCLUDE(CPack)
+
