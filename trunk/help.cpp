@@ -53,36 +53,50 @@ void print_usage(void)
     printf("Try '%s --help' for more options.\n", PACKAGE);
 }
 
-void print_help(void)
+void print_help(const char* optarg)
 {
     printf("%s Version %s, convert CDG files to video\n", PACKAGE, VERSION);
     printf("Usage: %s [OPTION]... CDGFILE...\n", PACKAGE);
 
-    printf("\nGeneral options:\n");
-    printf(" -V  --version              Display the version of %s and exit.\n", PACKAGE);
-    printf(" -h  --help                 Print this help.\n");
+    if (optarg == NULL)
+    {
+      printf("\nGeneral options:\n");
+      printf(" -V  --version              Display the version of %s and exit.\n", PACKAGE);
+      printf(" -h  --help                 Print this help.\n");
+      printf("     --show-formats         Show available output file formats.\n");
+      printf("     --show-codecs          Show available output codecs.\n");
 
-    printf("\nEncoding options:\n");
-    printf(" -f  --format   <type>      Specify the output file format (default: avi)\n");
+      printf("\nEncoding options:\n");
+      printf(" -f  --format   <type>      Specify the output file format (default: avi)\n");
+      
+      printf(" -s             <size>      Set frame size (WxH or abbreviation, default: 352x288)\n");
+      printf("     --aspect   <ratio>     Set aspect ratio (4:3, 16:9 or 1.3333, 1.7777, default: 4:3)\n");
+      
+      printf(" -r             <rate>      Set frame rate (Hz value, fraction or abbreviation, default: pal)\n");
+
+      printf("\n");
+      printf("     --acodec   <codec>     Force audio codec\n");
+      printf("     --vcodec   <codec>     Force video codec\n");
+	  
+      printf("\n");
+      printf("     --stdout               Redirect video output to standard output\n");
+      printf("     --force-encode-audio   By default, if the input audio codec is the same as the output one,\n");
+      printf("                            the audio is copied. If you specify this option the audio will be\n");
+      printf("                            re-encode always. This can helps in case of corrupted audio files,\n");
+      printf("                            but it's possible to reduce the audio quality.\n");
+
+      print_abbreviation();
+    }
     
-    printf(" -s             <size>      Set frame size (WxH or abbreviation, default: 352x288)\n");
-    printf("     --aspect   <ratio>     Set aspect ratio (4:3, 16:9 or 1.3333, 1.7777, default: 4:3)\n");
+    if (optarg && strcmp(optarg, "formats") == 0)
+    {
+      print_formats();
+    }
     
-    printf(" -r             <rate>      Set frame rate (Hz value, fraction or abbreviation, default: pal)\n");
-
-    //printf("\n");
-    //printf("     --acodec   <codec>     Force audio codec\n");
-    //printf("     --vcodec   <codec>     Force video codec\n");
-        
-    printf("\n");
-    printf("     --force-encode-audio   By default, if the input audio codec is the same as the output one,\n");
-    printf("                            the audio is copied. If you specify this option the audio will be\n");
-    printf("                            re-encode always. This can helps in case of corrupted audio files,\n");
-    printf("                            but it's possible to reduce the audio quality.\n");
-
-    print_abbreviation();
-    print_formats();
-    //print_codecs();
+    if (optarg && strcmp(optarg, "codecs") == 0)
+    {
+      print_codecs();
+    }
 
     printf("\n");
 }
