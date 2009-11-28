@@ -58,7 +58,8 @@ ENDIF (LIB_SWSCALE)
 
 #install location
 INSTALL(TARGETS ${PACKAGE} RUNTIME DESTINATION bin)
- 
+INSTALL(PROGRAMS cdg2video-player DESTINATION bin)
+
 # Packing stuff (make package_source)
 SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "CDG+MP3 to video converter")
 SET(CPACK_PACKAGE_VENDOR "Nikolay Nikolov")
