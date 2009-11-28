@@ -1,0 +1,3 @@
+#/bin/bash
+
+./cdg2video --stdout "$1" | mplayer -cache 128 - 
