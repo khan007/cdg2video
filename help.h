@@ -21,7 +21,7 @@
 
 void print_version(void);
 void print_usage(void);
-void print_help(void);
+void print_help(const char* optarg);
 
 #endif // #define _CDG2VIDEO_HELP_H
 

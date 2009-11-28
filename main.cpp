@@ -32,10 +32,16 @@
 #include "help.h"
 #include "utils.h"
 
-#define OPTIONID_FORCE_ENCODE_AUDIO 500
-#define OPTIONID_ACODEC             501
-#define OPTIONID_VCODEC             502
-#define OPTIONID_ASPECT             503
+enum
+{
+  OPTIONID_FORCE_ENCODE_AUDIO  = 500,
+  OPTIONID_ACODEC,
+  OPTIONID_VCODEC,
+  OPTIONID_ASPECT,
+  OPTIONID_SHOW_FORMATS,
+  OPTIONID_SHOW_CODECS,
+  OPTIONID_STDOUT
+};
 
 #define MAX_AUDIO_PACKET_SIZE (128 * 1024)
 
@@ -80,7 +86,8 @@ typedef struct
     // misc
 
     int packet_size;
-    float mux_preload;    // demux-decode delay in seconds
+    float mux_preload;    	// demux-decode delay in seconds
+    int video_stdout;		// use "/dev/stdout" as a video file name
 
 }tOptions;
 
@@ -107,6 +114,7 @@ static tOptions Options =
 
     0,          // packet_size
     0.5,        // demux-decode delay in seconds
+    0		// use "/dev/stdout" as a video file name
 };
 
 
@@ -689,7 +697,7 @@ int cdg2avi(const char* avifile, const char* audiofile)
     }
 
     // allocate the output media context
-    oc = av_alloc_format_context();
+    oc = avformat_alloc_context();
     if (!oc) {
         fprintf(stderr, "Memory error\n");
         exit(1);
@@ -916,12 +924,18 @@ static void set_format_defaults(const char* format)
 static struct option long_options[] =
 {
     {"help",                no_argument,        0, 'h'},
+    {"show-formats",        no_argument,        0, OPTIONID_SHOW_FORMATS},
+    {"show-codecs",         no_argument,        0, OPTIONID_SHOW_CODECS}, 
     {"version",             no_argument,        0, 'V'},
+    
     {"format",              required_argument,  0, 'f'},
     {"force-encode-audio",  no_argument,        0, OPTIONID_FORCE_ENCODE_AUDIO},
     {"acodec",              required_argument,  0, OPTIONID_ACODEC},
     {"vcodec",              required_argument,  0, OPTIONID_VCODEC},
     {"aspect",              required_argument,  0, OPTIONID_ASPECT},
+    
+    {"stdout",              no_argument,        0, OPTIONID_STDOUT},
+    
     {0, 0, 0, 0}
 };
 
@@ -947,11 +961,22 @@ int main(int argc, char *argv[])
     cdgfile.setSurface(&frameSurface);
 
     // parse command line options
-    while ((c = getopt_long(argc, argv, "hVs:r:f:", long_options, &option_index)) != -1) {
-        switch (c) {
+    while ((c = getopt_long(argc, argv, "hVs:r:f:", long_options, &option_index)) != -1) 
+    {
+        switch (c) 
+        {
         case 'h':
-            print_help();
+            print_help(NULL);
             return 0;
+    
+        case OPTIONID_SHOW_FORMATS:
+            print_help("formats");
+            return 0;
+  
+        case OPTIONID_SHOW_CODECS:
+            print_help("codecs");
+            return 0;
+
         case 'V':
             print_version();
             return 0;
@@ -1015,10 +1040,14 @@ int main(int argc, char *argv[])
             break;
 
         case OPTIONID_ASPECT:
-	    if (get_aspect_ratio(&Options.aspect_ratio, optarg)) {
+            if (get_aspect_ratio(&Options.aspect_ratio, optarg)) {
                 fprintf(stderr, "Incorrect aspect ratio\n");
                 return 1;
             }
+            break;
+            
+        case OPTIONID_STDOUT:
+            Options.video_stdout = 1;
             break;
 
         default:
@@ -1056,7 +1085,7 @@ int main(int argc, char *argv[])
         }
 
         if (cdgfile.open(argv[files])) {
-            fprintf(stdout, "Converting: %s\n", argv[files]);
+            fprintf(stderr, "Converting: %s\n", argv[files]);
 
             // find corresponding audio file
             audiofile = get_audio_filename(argv[files]);
@@ -1070,6 +1099,11 @@ int main(int argc, char *argv[])
             strcpy(avifile, argv[files]);
             p = strrchr(avifile, '.'); p++;
 
+	    if (Options.video_stdout)
+	    {
+		strcpy(avifile, "/dev/stdout");
+	    }
+	    else
             if (Options.format->extensions == NULL) {
                 strcpy(p, "mpg");
             }
