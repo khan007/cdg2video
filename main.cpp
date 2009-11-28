@@ -125,7 +125,7 @@ static int audio_outbuf_size;
 static int16_t *audio_samples;
 static int audio_samples_size;
 
-static AVFifoBuffer audio_fifo;
+static AVFifoBuffer *audio_fifo;
 static uint8_t *audio_fifo_samples;
 
 ReSampleContext *audio_resample_buf; 
@@ -219,7 +219,7 @@ static void open_audio(AVFormatContext *oc, AVStream *st)
     audio_samples_size = AVCODEC_MAX_AUDIO_FRAME_SIZE;
     audio_samples = (int16_t *)av_malloc(AVCODEC_MAX_AUDIO_FRAME_SIZE);
 
-    av_fifo_init(&audio_fifo, 2*MAX_AUDIO_PACKET_SIZE);
+    audio_fifo = av_fifo_alloc(2*MAX_AUDIO_PACKET_SIZE);
     audio_fifo_samples = (uint8_t *)av_malloc(2*MAX_AUDIO_PACKET_SIZE);
 }
 
@@ -282,9 +282,9 @@ static int write_audio_frame(AVFormatContext *ic, AVStream* is, AVFormatContext 
             // if data_size > frame_bytes we need to encode several times
             // if data_size < frame_bytes we need more data
 
-            av_fifo_generic_write(&audio_fifo, (uint8_t*)p_audio_samples, data_size, NULL);
+            av_fifo_generic_write(audio_fifo, (uint8_t*)p_audio_samples, data_size, NULL);
 
-            while (av_fifo_read(&audio_fifo, audio_fifo_samples, frame_bytes) == 0) 
+            while (av_fifo_generic_read(audio_fifo, audio_fifo_samples, frame_bytes, NULL) == 0) 
             {
                 AVPacket pkt_out;
                 av_init_packet(&pkt_out);
@@ -318,7 +318,7 @@ static int write_audio_frame(AVFormatContext *ic, AVStream* is, AVFormatContext 
 
         AVPacket pkt_out;
         av_init_packet(&pkt_out);
-        int fifo_bytes = av_fifo_size(&audio_fifo);
+        int fifo_bytes = av_fifo_size(audio_fifo);
 
         // encode any samples remaining in fifo
 
@@ -327,7 +327,7 @@ static int write_audio_frame(AVFormatContext *ic, AVStream* is, AVFormatContext 
             int fs_tmp = os->codec->frame_size;
             os->codec->frame_size = fifo_bytes / (2 * os->codec->channels);
 
-            if (av_fifo_read(&audio_fifo, (uint8_t *)audio_fifo_samples, fifo_bytes) == 0) 
+            if (av_fifo_generic_read(audio_fifo, (uint8_t *)audio_fifo_samples, fifo_bytes, NULL) == 0) 
             {
                 pkt_out.size = avcodec_encode_audio(os->codec, 
                                                     audio_outbuf, audio_outbuf_size, 
@@ -364,7 +364,7 @@ static void close_audio(AVFormatContext *oc, AVStream *st)
     av_free(audio_outbuf);
     av_free(audio_samples);
 
-    av_fifo_free(&audio_fifo);
+    av_fifo_free(audio_fifo);
     av_free(audio_fifo_samples);
 }
 
@@ -519,7 +519,7 @@ static AVStream *add_video_stream(AVFormatContext *oc, CodecID codec_id)
     return st;
 }
 
-static AVFrame *alloc_picture(int pix_fmt, int width, int height)
+static AVFrame *alloc_picture(PixelFormat pix_fmt, int width, int height)
 {
     AVFrame *picture;
     uint8_t *picture_buf;
