@@ -1,7 +1,7 @@
 
 PROJECT(cdg2video)
 SET(PACKAGE cdg2video)
-SET(VERSION 0.4)
+SET(VERSION 0.5)
 
 cmake_minimum_required(VERSION 2.6)
 
