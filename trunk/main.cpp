@@ -292,8 +292,10 @@ static int write_audio_frame(AVFormatContext *ic, AVStream* is, AVFormatContext 
 
             av_fifo_generic_write(audio_fifo, (uint8_t*)p_audio_samples, data_size, NULL);
 
-            while (av_fifo_generic_read(audio_fifo, audio_fifo_samples, frame_bytes, NULL) == 0) 
+            while (av_fifo_size(audio_fifo) >= frame_bytes)
             {
+                av_fifo_generic_read(audio_fifo, audio_fifo_samples, frame_bytes, NULL);
+                
                 AVPacket pkt_out;
                 av_init_packet(&pkt_out);
 
@@ -335,8 +337,9 @@ static int write_audio_frame(AVFormatContext *ic, AVStream* is, AVFormatContext 
             int fs_tmp = os->codec->frame_size;
             os->codec->frame_size = fifo_bytes / (2 * os->codec->channels);
 
-            if (av_fifo_generic_read(audio_fifo, (uint8_t *)audio_fifo_samples, fifo_bytes, NULL) == 0) 
+            if (av_fifo_size(audio_fifo) >= fifo_bytes)
             {
+                av_fifo_generic_read(audio_fifo, (uint8_t *)audio_fifo_samples, fifo_bytes, NULL);
                 pkt_out.size = avcodec_encode_audio(os->codec, 
                                                     audio_outbuf, audio_outbuf_size, 
                                                     (short *)audio_fifo_samples);
@@ -1099,11 +1102,11 @@ int main(int argc, char *argv[])
             strcpy(avifile, argv[files]);
             p = strrchr(avifile, '.'); p++;
 
-	    if (Options.video_stdout)
-	    {
-		strcpy(avifile, "/dev/stdout");
-	    }
-	    else
+            if (Options.video_stdout)
+            {
+                strcpy(avifile, "/dev/stdout");
+            }
+            else
             if (Options.format->extensions == NULL) {
                 strcpy(p, "mpg");
             }
