@@ -42,7 +42,7 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 #CHECK_FUNCTION_EXISTS(func_name HAVE_func_name)
 
 #list all source files here
-ADD_EXECUTABLE(cdg2video main.cpp cdgfile.cpp help.cpp utils.cpp)
+ADD_EXECUTABLE(cdg2video main.cpp cdgfile.cpp help.cpp utils.cpp cdgio.cpp)
 
 #Linking...
 FIND_LIBRARY(LIB_SWSCALE  swscale)

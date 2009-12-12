@@ -31,6 +31,7 @@
 #include "cdgfile.h"
 #include "help.h"
 #include "utils.h"
+#include "cdgio.h"
 
 enum
 {
@@ -806,7 +807,10 @@ int cdg2avi(const char* avifile, const char* audiofile)
             } while (audio_ok == 0 && audio_pts < video_pts);
         }
 
-        fprintf(stderr, "Progress: %d %%\r", (int)((video_pts * 100) / duration));
+        if (duration) 
+        {
+            fprintf(stderr, "Progress: %d %%\r", (int)((video_pts * 100) / duration));
+        }
     }
     fprintf(stderr, "\n"); // save the status line
 
@@ -960,9 +964,6 @@ int main(int argc, char *argv[])
             Options.format->audio_codec = CODEC_ID_MP3;
     }
 
-    // set global surface
-    cdgfile.setSurface(&frameSurface);
-
     // parse command line options
     while ((c = getopt_long(argc, argv, "hVs:r:f:", long_options, &option_index)) != -1) 
     {
@@ -1086,8 +1087,11 @@ int main(int argc, char *argv[])
             fprintf(stderr, "File is ignored (no cdg exetension) : %s\n", argv[files]);
             continue;
         }
-
-        if (cdgfile.open(argv[files])) {
+        
+        CdgFileIoStream cdgstream;
+        
+        if (cdgstream.open(argv[files], "r") && cdgfile.open(&cdgstream, &frameSurface)) 
+        {
             fprintf(stderr, "Converting: %s\n", argv[files]);
 
             // find corresponding audio file

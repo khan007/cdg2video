@@ -18,9 +18,7 @@
 #ifndef __INC_CDGFILE_H__
 #define __INC_CDGFILE_H__
 
-#include <iostream>
-#include <fstream>
-using namespace std;
+#include "cdgio.h"
 
 // This is the size of the display as defined by the CDG specification.
 // The pixels in this region can be painted, and scrolling operations
@@ -65,10 +63,9 @@ public:
     CDGFile();
     virtual ~CDGFile();
 
-    bool open(const char* file);
+    bool open(CdgIoStream* pStream, ISurface* pSurface);
     void close();
 
-    void setSurface(ISurface* surface) { m_pSurface = surface;}
     bool renderAtPosition(long ms);
     long getTotalDuration() { return m_duration; }
 
@@ -95,7 +92,7 @@ protected:
     int m_hOffset;
     int m_vOffset;
 
-    ifstream  m_file;
+    CdgIoStream* m_pStream;
     ISurface* m_pSurface;
     long m_positionMs;
     long m_duration;
