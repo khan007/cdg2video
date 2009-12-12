@@ -41,6 +41,7 @@
 
 CDGFile::CDGFile()
 {
+    m_pStream = NULL;
     m_pSurface = NULL;
 }
 
@@ -51,33 +52,27 @@ CDGFile::~CDGFile()
 
 // Open CDG file
 
-bool CDGFile::open(const char* file)
-{
-    close();    
-    if (m_pSurface == NULL) return false; // set surface before to call open
+bool CDGFile::open(CdgIoStream* pStream, ISurface* pSurface)
+{  
+    m_pStream = pStream;
+    m_pSurface = pSurface;
+    
+    if (m_pStream == NULL) return false;
+    if (m_pSurface == NULL) return false;
 
-    m_file.open(file, ios::binary|ios::in);
-    m_positionMs = 0;
+    reset();
 
-    struct stat results;
-    if (stat(file, &results) == 0)
-        m_duration = ((results.st_size / CDG_PACKET_SIZE) * 1000) / 300;
-    else
-        m_duration = 0; // An error occurred
+    m_duration = ((m_pStream->getsize() / CDG_PACKET_SIZE) * 1000) / 300;
 
-    return m_file.is_open();
+    return true;
 }
 
 // Close currently open file
 
 void CDGFile::close()
 {
-    if (m_file.is_open()) 
-    {
-        m_file.close();
-    }
-
-    reset();
+    m_pStream = NULL;
+    m_pSurface = NULL;
 }
 
 // Reinitialize local members
@@ -116,13 +111,15 @@ bool CDGFile::renderAtPosition(long ms)
     CdgPacket pack;
     long numPacks = 0;
     bool res = true;
-
-    if (!m_file.is_open()) return false;
+    
+    if (m_pStream == NULL) 
+    {
+        return false;
+    }
 
     if (ms < m_positionMs)
     {
-        m_file.clear(); // clear eof flag
-        m_file.seekg(0, std::ios_base::beg);
+        m_pStream->seek(0, SEEK_SET);
         m_positionMs = 0;
     }
 
@@ -145,18 +142,20 @@ bool CDGFile::renderAtPosition(long ms)
 
 bool CDGFile::readPacket(CdgPacket& pack)
 {
-    if (!m_file.is_open() || m_file.eof())
+    if (m_pStream == NULL || m_pStream->eof())
     {
         return false;
     }
+    
+    int read = 0;
 
-    m_file.read((char*)&pack.command, 1);
-    m_file.read((char*)&pack.instruction, 1);
-    m_file.read((char*)pack.parityQ, 2);
-    m_file.read((char*)pack.data, 16);
-    m_file.read((char*)pack.parityP, 4);
+    read += m_pStream->read(&pack.command, 1);
+    read += m_pStream->read(&pack.instruction, 1);
+    read += m_pStream->read(pack.parityQ, 2);
+    read += m_pStream->read(pack.data, 16);
+    read += m_pStream->read(pack.parityP, 4);
 
-    return true;
+    return (read == 24);
 }
 
 void CDGFile::processPacket(const CdgPacket *pack) 
