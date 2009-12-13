@@ -31,7 +31,6 @@
 #include "cdgfile.h"
 #include "help.h"
 #include "utils.h"
-#include "cdgio.h"
 
 enum
 {
@@ -948,8 +947,6 @@ static struct option long_options[] =
 
 int main(int argc, char *argv[])
 {
-    char* p;
-    char* avifile, *audiofile;
     int c, option_index = 0;
 
     // initialize libavcodec, and register all codecs and formats
@@ -1078,31 +1075,80 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    for (int files = optind; files < argc; files++) {
-
-        // check that file extension is cdg
-        p = strrchr(argv[files], '.');
-        if (p == NULL || strcasecmp(p+1, "cdg") != 0) 
+    for (int files = optind; files < argc; files++) 
+    {
+        bool extcdg = false;
+        bool extzip = false;
+        
+        char* p = strrchr(argv[files], '.');
+        
+        if (p && strcasecmp(p+1, "cdg") == 0) extcdg = true;
+        else
+        if (p && strcasecmp(p+1, "zip") == 0) extzip = true;
+            
+        if (extcdg == false && extzip == false)
         {
-            fprintf(stderr, "File is ignored (no cdg exetension) : %s\n", argv[files]);
+            fprintf(stderr, "File is ignored (unsupported file type) : %s\n", argv[files]);
             continue;
         }
         
-        CdgFileIoStream cdgstream;
+        CdgIoStream* pCdgStream = NULL;
+        //CdgIoStream* pAudioStream = NULL;
+
+        CdgFileIoStream cdgfilestream;
+        CdgFileIoStream audiofilestream;
+        CdgZipFileIoStream cdgzipstream;
         
-        if (cdgstream.open(argv[files], "r") && cdgfile.open(&cdgstream, &frameSurface)) 
+        if (extcdg && cdgfilestream.open(argv[files], "r"))
+        {
+            pCdgStream = &cdgfilestream;
+        }
+        
+        struct zip* zipfile = NULL;
+        if (extzip)
+        {
+            int error;
+            zipfile = zip_open(argv[files], 0, &error);
+            if (zipfile) 
+            {
+                // find cdg file
+                int cdgidx = 0; 
+                const char* filename = NULL;
+                
+                do 
+                {
+                    filename = zip_get_name(zipfile, cdgidx++, 0);
+                    if (filename)
+                    {
+                        const char* p = strrchr(filename, '.');
+                        if (p && strcasecmp(p+1, "cdg") == 0) break;
+                    }
+                } while (filename);
+                
+                if (filename && cdgzipstream.open(zipfile, filename))
+                {
+                    pCdgStream = &cdgzipstream;
+                }
+            }
+            else 
+            {
+                fprintf(stderr, "Zip error %d on file: %s\n", error, argv[files]);
+            }
+        }
+        
+        if (pCdgStream && cdgfile.open(pCdgStream, &frameSurface)) 
         {
             fprintf(stderr, "Converting: %s\n", argv[files]);
 
             // find corresponding audio file
-            audiofile = get_audio_filename(argv[files]);
+            char* audiofile = get_audio_filename(argv[files]);
 
             if (audiofile == NULL) {
                 fprintf(stderr, "WARNING: Can't find audio file (*.mp3)\n");
             }
 
             // generate avi file name
-            avifile = (char*)malloc(strlen(argv[files]) + 64);
+            char* avifile = (char*)malloc(strlen(argv[files]) + 64);
             strcpy(avifile, argv[files]);
             p = strrchr(avifile, '.'); p++;
 
@@ -1131,9 +1177,13 @@ int main(int argc, char *argv[])
             free(avifile);
             if (audiofile) free(audiofile);
         }
-        else {
+        else 
+        {
             fprintf(stderr, "Unable to open file: %s\n", argv[files]);
         }
+        
+        cdgzipstream.close();
+        if (zipfile) zip_close(zipfile);
     }
 
     return 0;

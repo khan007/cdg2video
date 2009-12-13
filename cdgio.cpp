@@ -36,6 +36,8 @@ int64_t cdgio_seek(void *opaque, int64_t offset, int whence)
     return pStream->seek((int)offset, whence);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 CdgFileIoStream::CdgFileIoStream()
 {
     m_file = NULL;
@@ -48,6 +50,7 @@ CdgFileIoStream::~CdgFileIoStream()
 
 bool CdgFileIoStream::open(const char* file, const char* mode)
 {
+    close();
     m_file = fopen(file, mode);
     return (m_file != NULL);
 }
@@ -91,5 +94,81 @@ int CdgFileIoStream::getsize()
     }
     
     return 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+CdgZipFileIoStream::CdgZipFileIoStream()
+{
+    m_file = NULL;
+    m_fileidx = -1;
+    m_filesize = 0;
+}
+
+CdgZipFileIoStream::~CdgZipFileIoStream()
+{
+    close();
+}
+
+bool CdgZipFileIoStream::open(struct zip *archive, const char *fname)
+{
+    close();
+    
+    if (archive == NULL || fname == NULL)
+    {
+        return false;
+    }
+    
+    struct zip_stat zs;
+    if (zip_stat(archive, fname, 0, &zs)) 
+    {
+        return false;
+    }
+
+    m_fileidx = zs.index;
+    m_filesize = zs.size;
+
+    m_file = zip_fopen_index(archive, m_fileidx, 0);
+    return m_file != NULL;
+}
+
+void CdgZipFileIoStream::close()
+{
+    if (m_file)
+    {
+        zip_fclose(m_file);
+    }
+    
+    m_file = NULL;
+    m_fileidx = -1;
+    m_filesize = 0;
+}
+
+int CdgZipFileIoStream::read(void *buf, int buf_size)
+{
+    return zip_fread(m_file, buf, buf_size);
+}
+
+int CdgZipFileIoStream::write(const void *buf, int buf_size)
+{
+    return 0;
+}
+
+int CdgZipFileIoStream::seek(int offset, int whence)
+{
+    return -1;
+}
+
+int CdgZipFileIoStream::eof()
+{
+    int ze;
+    zip_file_error_get(m_file, &ze, NULL);
+    
+    return ze == ZIP_ER_EOF;
+}
+
+int CdgZipFileIoStream::getsize()
+{
+    return m_filesize;
 }
 
