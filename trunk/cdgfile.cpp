@@ -119,7 +119,7 @@ bool CDGFile::renderAtPosition(long ms)
 
     if (ms < m_positionMs)
     {
-        m_pStream->seek(0, SEEK_SET);
+        if (m_pStream->seek(0, SEEK_SET) < 0) return false;
         m_positionMs = 0;
     }
 

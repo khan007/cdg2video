@@ -19,45 +19,55 @@
 #define __INC_CDGIO_H__
 
 #include <inttypes.h>
+#include <zip.h>
 #include <stdio.h>
 
 class CdgIoStream
 {
 public:
-      virtual int read(void *buf, int buf_size) = 0;
-      virtual int write(const void *buf, int buf_size) = 0;
-      virtual int seek(int offset, int whence) = 0;
-      virtual int eof() = 0;
-      virtual int getsize() = 0;
+    virtual int read(void *buf, int buf_size) = 0;
+    virtual int write(const void *buf, int buf_size) = 0;
+    virtual int seek(int offset, int whence) = 0;
+    virtual int eof() = 0;
+    virtual int getsize() = 0;
 };
 
 class CdgFileIoStream : public CdgIoStream
 {
 public:
-      CdgFileIoStream();
-      virtual ~CdgFileIoStream();
-      bool open(const char* file, const char* mode);
-      void close();
+    CdgFileIoStream();
+    virtual ~CdgFileIoStream();
+    bool open(const char* file, const char* mode);
+    void close();
 
-      virtual int read(void *buf, int buf_size);
-      virtual int write(const void *buf, int buf_size);
-      virtual int seek(int offset, int whence);
-      virtual int eof();
-      virtual int getsize();
+    virtual int read(void *buf, int buf_size);
+    virtual int write(const void *buf, int buf_size);
+    virtual int seek(int offset, int whence);
+    virtual int eof();
+    virtual int getsize();
       
 protected:
-      FILE*  m_file;
+    FILE*  m_file;
 };
 
 class CdgZipFileIoStream : public CdgIoStream
 {
 public:
-      CdgZipFileIoStream();
-      virtual ~CdgZipFileIoStream();
+    CdgZipFileIoStream();
+    virtual ~CdgZipFileIoStream();
+    bool open(struct zip *archive, const char *fname);
+    void close();
   
-      virtual int read(void *buf, int buf_size);
-      virtual int write(const void *buf, int buf_size);
-      virtual int seek(int offset, int whence);
+    virtual int read(void *buf, int buf_size);
+    virtual int write(const void *buf, int buf_size);
+    virtual int seek(int offset, int whence);
+    virtual int eof();
+    virtual int getsize();
+      
+protected:
+    struct zip_file* m_file;
+    int m_fileidx;
+    int m_filesize;
 };
 
 int cdgio_read_packet(void *opaque, uint8_t *buf, int buf_size);
