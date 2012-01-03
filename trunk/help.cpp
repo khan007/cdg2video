@@ -159,7 +159,7 @@ static void print_codecs(void)
     {
         if (codec->name == NULL) break;
         if (codec->encode == 0) continue;
-        if (codec->type != CODEC_TYPE_AUDIO) continue;
+        if (codec->type != AVMEDIA_TYPE_AUDIO) continue;
 
         printf(" %-16s ", codec->name);
      
@@ -178,7 +178,7 @@ static void print_codecs(void)
     {
         if (codec->name == NULL) break;
         if (codec->encode == 0) continue;
-        if (codec->type != CODEC_TYPE_VIDEO) continue;
+        if (codec->type != AVMEDIA_TYPE_VIDEO) continue;
 
         printf(" %-16s ", codec->name);
      
