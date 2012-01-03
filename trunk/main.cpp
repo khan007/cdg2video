@@ -186,7 +186,7 @@ static AVStream *add_audio_stream(AVFormatContext *oc, CodecID codec_id)
 
     c = st->codec;
     c->codec_id = codec_id;
-    c->codec_type = CODEC_TYPE_AUDIO;
+    c->codec_type = AVMEDIA_TYPE_AUDIO;
 
     /* put sample parameters */
     c->bit_rate = Options.audio_bit_rate;
@@ -256,9 +256,13 @@ static int write_audio_frame(AVFormatContext *ic, AVStream* is, AVFormatContext 
 
             // decode 
             data_size = audio_samples_size;
-            decoded = avcodec_decode_audio2(is->codec,
+            AVPacket pkt;
+            av_init_packet(&pkt);
+            pkt.data = ptr;
+            pkt.size = len;
+            decoded = avcodec_decode_audio3(is->codec,
                                 audio_samples, &data_size,
-                                ptr, len);
+                                &pkt);
     
             if (decoded < 0) { // if decoder failed
                 av_free_packet(&pkt);
@@ -311,7 +315,7 @@ static int write_audio_frame(AVFormatContext *ic, AVStream* is, AVFormatContext 
                         pkt_out.pts = av_rescale_q(os->codec->coded_frame->pts, os->codec->time_base, os->time_base);
                     }
     
-                    pkt_out.flags |= PKT_FLAG_KEY;
+                    pkt_out.flags |= AV_PKT_FLAG_KEY;
                     pkt_out.stream_index= os->index;
                     pkt_out.data = audio_outbuf;
         
@@ -353,7 +357,7 @@ static int write_audio_frame(AVFormatContext *ic, AVStream* is, AVFormatContext 
                     pkt_out.pts = av_rescale_q(os->codec->coded_frame->pts, os->codec->time_base, os->time_base);
                 }
     
-                pkt_out.flags |= PKT_FLAG_KEY;
+                pkt_out.flags |= AV_PKT_FLAG_KEY;
                 pkt_out.stream_index= os->index;
                 pkt_out.data = audio_outbuf;
         
@@ -399,7 +403,7 @@ static int copy_audio_frame(AVFormatContext *ic, AVStream* is, AVFormatContext *
         if (pkt.dts != (int64_t)AV_NOPTS_VALUE)
             pkt.dts = av_rescale_q(pkt.dts, is->time_base, os->time_base);
 
-        pkt.flags |= PKT_FLAG_KEY;
+        pkt.flags |= AV_PKT_FLAG_KEY;
         pkt.stream_index= os->index;
 
         //av_pkt_dump(stderr, &pkt, 0);
@@ -419,7 +423,7 @@ static AVStream* open_input_audio(const char* afile, AVFormatContext **ic)
     *ic = NULL;
 
     // Open audio file
-    if (av_open_input_file(ic, afile, NULL, 0, NULL) != 0)
+    if (avformat_open_input(ic, afile, NULL, NULL) != 0)
         return NULL; // Couldn't open file
 
     // Retrieve stream information
@@ -427,12 +431,12 @@ static AVStream* open_input_audio(const char* afile, AVFormatContext **ic)
         return NULL; // Couldn't find stream information
 
     // Dump information about file onto standard error
-    dump_format(*ic, 0, afile, false);
+    av_dump_format(*ic, 0, afile, false);
 
     // Find the first audio stream
     audioStreamIdx = -1;
     for (unsigned int i = 0; i < (*ic)->nb_streams; i++) {
-        if ((*ic)->streams[i]->codec->codec_type == CODEC_TYPE_AUDIO) {
+        if ((*ic)->streams[i]->codec->codec_type == AVMEDIA_TYPE_AUDIO) {
             audioStreamIdx = i;
             break;
         }
@@ -480,7 +484,7 @@ static AVStream *add_video_stream(AVFormatContext *oc, CodecID codec_id)
 
     c = st->codec;
     c->codec_id = codec_id;
-    c->codec_type = CODEC_TYPE_VIDEO;
+    c->codec_type = AVMEDIA_TYPE_VIDEO;
     c->flags |= Options.video_codec_flags;
 
     c->bit_rate           = Options.video_bit_rate;
@@ -647,7 +651,7 @@ static void write_video_frame(AVFormatContext *oc, AVStream *st)
         }
 
         if(c->coded_frame->key_frame)
-            pkt.flags |= PKT_FLAG_KEY;
+            pkt.flags |= AV_PKT_FLAG_KEY;
 
         pkt.stream_index= st->index;
         pkt.data= video_outbuf;
@@ -738,7 +742,7 @@ int cdg2avi(const char* avifile, const char* audiofile)
         exit(1);
     }
 
-    dump_format(oc, 0, avifile, 1);
+    av_dump_format(oc, 0, avifile, 1);
 
     if (video_st)
         open_video(oc, video_st);
@@ -752,9 +756,11 @@ int cdg2avi(const char* avifile, const char* audiofile)
         if (audio_st->codec->channels != in_audio_st->codec->channels ||
             audio_st->codec->sample_rate != in_audio_st->codec->sample_rate) 
         {
-            audio_resample_buf = audio_resample_init(
+            audio_resample_buf = av_audio_resample_init(
                                     audio_st->codec->channels, in_audio_st->codec->channels,
-                                    audio_st->codec->sample_rate, in_audio_st->codec->sample_rate);
+                                    audio_st->codec->sample_rate, in_audio_st->codec->sample_rate,
+                                    SAMPLE_FMT_S16, SAMPLE_FMT_S16,
+                                    16, 10, 0, 0.8);
 
             if (!audio_resample_buf) {
                 fprintf(stderr, "Can't resample audio.  Aborting.\n");
@@ -953,10 +959,10 @@ int main(int argc, char *argv[])
     av_register_all();
 
     // set default output format - xvid avi with mp3 audio
-    Options.format = guess_format("avi", NULL, NULL);
+    Options.format = av_guess_format("avi", NULL, NULL);
     if (Options.format) {
-        if (avcodec_find_encoder(CODEC_ID_XVID)) 
-            Options.format->video_codec = CODEC_ID_XVID;
+        //if (avcodec_find_encoder(CODEC_ID_XVID)) 
+        //    Options.format->video_codec = CODEC_ID_XVID;
         if (avcodec_find_encoder(CODEC_ID_MP3))  
             Options.format->audio_codec = CODEC_ID_MP3;
     }
@@ -1002,7 +1008,7 @@ int main(int argc, char *argv[])
             break;
 
         case 'f':
-            Options.format = guess_format(optarg, NULL, NULL);
+            Options.format = av_guess_format(optarg, NULL, NULL);
 
             if (Options.format == NULL) {
                 fprintf(stderr, "Could not find suitable output format\n");
@@ -1019,7 +1025,7 @@ int main(int argc, char *argv[])
         case OPTIONID_ACODEC:
             if (Options.format) {
                 AVCodec *p = avcodec_find_encoder_by_name(optarg);
-                if (p && p->type == CODEC_TYPE_AUDIO) Options.format->audio_codec = p->id;
+                if (p && p->type == AVMEDIA_TYPE_AUDIO) Options.format->audio_codec = p->id;
                 else {
                     fprintf(stderr, "Could not find '%s' audio codec\n", optarg);
                     return 1;
@@ -1031,7 +1037,7 @@ int main(int argc, char *argv[])
         case OPTIONID_VCODEC:
             if (Options.format) {
                 AVCodec *p = avcodec_find_encoder_by_name(optarg);
-                if (p && p->type == CODEC_TYPE_VIDEO) Options.format->video_codec = p->id;
+                if (p && p->type == AVMEDIA_TYPE_VIDEO) Options.format->video_codec = p->id;
                 else {
                     fprintf(stderr, "Could not find '%s' video codec\n", optarg);
                     return 1;
