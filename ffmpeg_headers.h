@@ -14,6 +14,7 @@ extern "C" {
   #include "libswscale/swscale.h"
   #include "libavutil/fifo.h"
   #include "libavutil/mathematics.h"
+  #include "libavutil/channel_layout.h"
 #endif
 }
 

@@ -146,15 +146,18 @@ static AVStream *add_audio_stream(AVFormatContext *oc, AVStream* is)
 
     if (is == NULL) return NULL;
 
-    st = av_new_stream(oc, 1);
+    st = avformat_new_stream(oc, NULL);
     if (!st) {
         fprintf(stderr, "Could not alloc audio stream\n");
         exit(1);
     }
+    st->id = 1;
 
     c = st->codec;
     c->codec_id = is->codec->codec_id ;
     c->codec_type = is->codec->codec_type; 
+    c->sample_fmt = is->codec->sample_fmt;
+    c->channel_layout = is->codec->channel_layout;
 
     // put sample parameters
     c->bit_rate = is->codec->bit_rate; 
@@ -169,30 +172,73 @@ static AVStream *add_audio_stream(AVFormatContext *oc, AVStream* is)
     else
         c->time_base = is->time_base;
 
+    // some formats want stream headers to be separate
+    if (oc->oformat->flags & AVFMT_GLOBALHEADER) 
+        c->flags |= CODEC_FLAG_GLOBAL_HEADER;
+
     return st;
 }
 
 // add audio stream by codec_id
-static AVStream *add_audio_stream(AVFormatContext *oc, CodecID codec_id)
+static AVStream *add_audio_stream(AVFormatContext *oc, AVCodecID codec_id)
 {
     AVCodecContext *c;
     AVStream *st;
+    AVCodec *codec;
 
-    st = av_new_stream(oc, 1);
+    codec = avcodec_find_encoder(codec_id);
+    if (!codec) 
+    {
+        fprintf(stderr, "Codec not found\n");
+        exit(1);
+    }
+
+    if (codec->type != AVMEDIA_TYPE_AUDIO)
+    {
+        fprintf(stderr, "Invalid audio codec\n");
+        exit(1);
+    }
+
+    st = avformat_new_stream(oc, codec);
     if (!st) {
         fprintf(stderr, "Could not alloc audio stream\n");
         exit(1);
     }
+    st->id = 1;
 
     c = st->codec;
     c->codec_id = codec_id;
     c->codec_type = AVMEDIA_TYPE_AUDIO;
 
     /* put sample parameters */
+
     c->bit_rate = Options.audio_bit_rate;
+
     c->sample_rate = Options.audio_sample_rate;
-    c->channels = Options.audio_channels;
-    //c->time_base= (AVRational){1, c->sample_rate};
+    if (codec->supported_samplerates) 
+    {
+        c->sample_rate = codec->supported_samplerates[0];
+        for (int i = 0; codec->supported_samplerates[i]; i++) 
+        {
+           if (codec->supported_samplerates[i] == Options.audio_sample_rate)
+               c->sample_rate = Options.audio_sample_rate;
+        }
+    }
+
+    c->channel_layout = AV_CH_LAYOUT_STEREO;
+    if (codec->channel_layouts) 
+    {
+        c->channel_layout = codec->channel_layouts[0];
+        for (int i = 0; codec->channel_layouts[i]; i++) 
+        {
+            if (codec->channel_layouts[i] == AV_CH_LAYOUT_STEREO)
+                c->channel_layout = AV_CH_LAYOUT_STEREO;
+        }
+    }
+
+    c->sample_fmt = codec->sample_fmts ? codec->sample_fmts[0] : AV_SAMPLE_FMT_FLTP;
+    c->channels = av_get_channel_layout_nb_channels(c->channel_layout);
+    st->time_base= (AVRational){1, c->sample_rate};
 
     if (oc->oformat->flags & AVFMT_GLOBALHEADER) 
         c->flags |= CODEC_FLAG_GLOBAL_HEADER;
@@ -216,7 +262,7 @@ static void open_audio(AVFormatContext *oc, AVStream *st)
     }
 
     // open it
-    if (avcodec_open(c, codec) < 0) {
+    if (avcodec_open2(c, codec, NULL) < 0) {
         fprintf(stderr, "Could not open output audio codec (ID: 0x%08X)\n", c->codec_id);
         exit(1);
     }
@@ -427,7 +473,7 @@ static AVStream* open_input_audio(const char* afile, AVFormatContext **ic)
         return NULL; // Couldn't open file
 
     // Retrieve stream information
-    if (av_find_stream_info(*ic) < 0)
+    if (avformat_find_stream_info(*ic, NULL) < 0)
         return NULL; // Couldn't find stream information
 
     // Dump information about file onto standard error
@@ -456,7 +502,7 @@ static AVStream* open_input_audio(const char* afile, AVFormatContext **ic)
     }
 
     // open it
-    if (avcodec_open(st->codec, codec) < 0) {
+    if (avcodec_open2(st->codec, codec, NULL) < 0) {
         fprintf(stderr, "Could not open input audio codec (ID: 0x%08X)\n", st->codec->codec_id);
         exit(1);
     }
@@ -467,20 +513,21 @@ static AVStream* open_input_audio(const char* afile, AVFormatContext **ic)
 static void close_input_audio(AVFormatContext *ic, AVStream* is)
 {
     if (is) avcodec_close(is->codec);
-    if (ic) av_close_input_file(ic);
+    if (ic) avformat_close_input(&ic);
 }
 
 // Add video output stream
-static AVStream *add_video_stream(AVFormatContext *oc, CodecID codec_id)
+static AVStream *add_video_stream(AVFormatContext *oc, AVCodecID codec_id)
 {
     AVCodecContext *c;
     AVStream *st;
 
-    st = av_new_stream(oc, 0);
+    st = avformat_new_stream(oc, NULL);
     if (!st) {
         fprintf(stderr, "Could not alloc video stream\n");
         exit(1);
     }
+    st->id = 0;
 
     c = st->codec;
     c->codec_id = codec_id;
@@ -571,7 +618,7 @@ static void open_video(AVFormatContext *oc, AVStream *st)
     }
 
     // open the codec
-    if (avcodec_open(c, codec) < 0) {
+    if (avcodec_open2(c, codec, NULL) < 0) {
         fprintf(stderr, "Could not open video codec (ID: 0x%08X)\n", c->codec_id);
         exit(1);
     }
@@ -735,13 +782,6 @@ int cdg2avi(const char* avifile, const char* audiofile)
         }
     }
 
-    // set the output parameters (must be done even if no
-    // parameters).
-    if (av_set_parameters(oc, NULL) < 0) {
-        fprintf(stderr, "Invalid output format parameters\n");
-        exit(1);
-    }
-
     av_dump_format(oc, 0, avifile, 1);
 
     if (video_st)
@@ -759,7 +799,7 @@ int cdg2avi(const char* avifile, const char* audiofile)
             audio_resample_buf = av_audio_resample_init(
                                     audio_st->codec->channels, in_audio_st->codec->channels,
                                     audio_st->codec->sample_rate, in_audio_st->codec->sample_rate,
-                                    SAMPLE_FMT_S16, SAMPLE_FMT_S16,
+                                    AV_SAMPLE_FMT_S16, AV_SAMPLE_FMT_S16,
                                     16, 10, 0, 0.8);
 
             if (!audio_resample_buf) {
@@ -771,7 +811,7 @@ int cdg2avi(const char* avifile, const char* audiofile)
 
     // open the output file, if needed
     if (!(Options.format->flags & AVFMT_NOFILE)) {
-        if (url_fopen(&oc->pb, avifile, URL_WRONLY) < 0) {
+        if (avio_open(&oc->pb, avifile, AVIO_FLAG_WRITE) < 0) {
             fprintf(stderr, "Could not open '%s'\n", avifile);
             exit(1);
         }
@@ -779,12 +819,10 @@ int cdg2avi(const char* avifile, const char* audiofile)
 
     // Set context options
     oc->packet_size = Options.packet_size;
-    // Fix "buffer underflow" warning when converting to mpeg formats
-    oc->preload = (int)(Options.mux_preload * AV_TIME_BASE);
     oc->max_delay = (int)(0.7 * AV_TIME_BASE);
 
     // write the stream header, if any
-    av_write_header(oc);
+    avformat_write_header(oc, NULL);
 
     // write avi file
     int duration = cdgfile.getTotalDuration(); // in miliseconds
@@ -837,11 +875,7 @@ int cdg2avi(const char* avifile, const char* audiofile)
 
     if (!(Options.format->flags & AVFMT_NOFILE)) {
         // close the output file
-	#if (LIBAVFORMAT_VERSION_INT < (52 << 16))
-        url_fclose(&oc->pb);
-	#else
-	url_fclose(oc->pb);
-	#endif
+	avio_close(oc->pb);
     }
 
     if (audio_resample_buf)
@@ -911,7 +945,6 @@ static void set_format_defaults(const char* format)
         Options.video_max_rate      = 2516000;
         Options.video_min_rate      = 0;
         Options.video_buffer_size   = 1835008; // 224*1024*8;
-        Options.video_codec_flags   = CODEC_FLAG_SVCD_SCAN_OFFSET;
 
         Options.audio_bit_rate      = 224000;
         Options.audio_sample_rate   = 44100;
