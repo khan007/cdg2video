@@ -129,11 +129,7 @@ static void print_formats(void)
     AVOutputFormat *ofmt;
     printf("\nFile formats:\n");
 
-#if LIBAVFORMAT_VERSION_INT < ((52<<16)+(2<<8)+0)
-    for (ofmt = first_oformat; ofmt != NULL; ofmt = ofmt->next) 
-#else
     for (ofmt = av_oformat_next(NULL); ofmt != NULL; ofmt = av_oformat_next(ofmt)) 
-#endif
     {
         if (ofmt->name == NULL) break;
 
@@ -151,14 +147,10 @@ static void print_codecs(void)
 
     printf("\nAudio Codecs:\n");
 
-#if LIBAVCODEC_VERSION_INT < ((51<<16)+(49<<8)+0)
-    for(codec = first_avcodec, i = 0; codec != NULL; codec = codec->next) 
-#else
     for(codec = av_codec_next(NULL), i = 0; codec != NULL; codec = av_codec_next(codec)) 
-#endif
     {
         if (codec->name == NULL) break;
-        if (codec->encode == 0) continue;
+        if (codec->encode2 == 0) continue;
         if (codec->type != AVMEDIA_TYPE_AUDIO) continue;
 
         printf(" %-16s ", codec->name);
@@ -170,14 +162,10 @@ static void print_codecs(void)
     if (i % 4) printf("\n");
     printf("\nVideo Codecs:\n");
 
-#if LIBAVCODEC_VERSION_INT < ((51<<16)+(49<<8)+0)
-    for(codec = first_avcodec, i = 0; codec != NULL; codec = codec->next) 
-#else
     for(codec = av_codec_next(NULL), i = 0; codec != NULL; codec = av_codec_next(codec)) 
-#endif
     {
         if (codec->name == NULL) break;
-        if (codec->encode == 0) continue;
+        if (codec->encode2 == 0) continue;
         if (codec->type != AVMEDIA_TYPE_VIDEO) continue;
 
         printf(" %-16s ", codec->name);
