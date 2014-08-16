@@ -44,6 +44,7 @@ enum
 };
 
 #define MAX_AUDIO_PACKET_SIZE (128 * 1024)
+#define MAX_AUDIO_FRAME_SIZE 192000 // 1 second of 48khz 32bit audio
 
 class VideoFrameSurface : public ISurface
 {
@@ -270,8 +271,8 @@ static void open_audio(AVFormatContext *oc, AVStream *st)
     audio_outbuf_size = 4*MAX_AUDIO_PACKET_SIZE;
     audio_outbuf = (uint8_t *)av_malloc(audio_outbuf_size);
 
-    audio_samples_size = AVCODEC_MAX_AUDIO_FRAME_SIZE;
-    audio_samples = (int16_t *)av_malloc(AVCODEC_MAX_AUDIO_FRAME_SIZE);
+    audio_samples_size = MAX_AUDIO_FRAME_SIZE;
+    audio_samples = (int16_t *)av_malloc(MAX_AUDIO_FRAME_SIZE);
 
     audio_fifo = av_fifo_alloc(2*MAX_AUDIO_PACKET_SIZE);
     audio_fifo_samples = (uint8_t *)av_malloc(2*MAX_AUDIO_PACKET_SIZE);
