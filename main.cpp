@@ -125,9 +125,6 @@ static VideoFrameSurface frameSurface;
 static AVFrame *picture, *tmp_picture;
 static struct SwsContext *img_convert_ctx;
 
-static uint8_t *video_outbuf;
-static int video_outbuf_size;
-
 static uint8_t *audio_outbuf;
 static int audio_outbuf_size;
 
@@ -138,6 +135,16 @@ static AVFifoBuffer *audio_fifo;
 static uint8_t *audio_fifo_samples;
 
 ReSampleContext *audio_resample_buf; 
+
+static int write_frame(AVFormatContext *fmt_ctx, const AVRational *time_base, AVStream *st, AVPacket *pkt)
+{
+    /* rescale output packet timestamp values from codec to stream timebase */
+    av_packet_rescale_ts(pkt, *time_base, st->time_base);
+    pkt->stream_index = st->index;
+
+    /* Write the compressed frame to the media file. */
+    return av_interleaved_write_frame(fmt_ctx, pkt);
+}
 
 // add audio stream, as a copy of is
 static AVStream *add_audio_stream(AVFormatContext *oc, AVStream* is)
@@ -585,21 +592,16 @@ static AVStream *add_video_stream(AVFormatContext *oc, AVCodecID codec_id)
 static AVFrame *alloc_picture(PixelFormat pix_fmt, int width, int height)
 {
     AVFrame *picture;
-    uint8_t *picture_buf;
-    int size;
 
-    picture = avcodec_alloc_frame();
+    picture = av_frame_alloc();
     if (!picture)
         return NULL;
-    size = avpicture_get_size(pix_fmt, width, height);
-    picture_buf = (uint8_t*)av_malloc(size);
-    if (!picture_buf) {
-        av_free(picture);
+
+    if (av_image_alloc(picture->data, picture->linesize, width, height, pix_fmt, 16) < 0) {
+        av_frame_free(&picture);
         return NULL;
     }
 
-    avpicture_fill((AVPicture *)picture, picture_buf,
-                    pix_fmt, width, height);
     return picture;
 }
 
@@ -622,18 +624,6 @@ static void open_video(AVFormatContext *oc, AVStream *st)
     if (avcodec_open2(c, codec, NULL) < 0) {
         fprintf(stderr, "Could not open video codec (ID: 0x%08X)\n", c->codec_id);
         exit(1);
-    }
-
-    video_outbuf = NULL;
-    if (!(oc->oformat->flags & AVFMT_RAWPICTURE)) {
-        /* allocate output buffer */
-        /* XXX: API change will be done */
-        /* buffers passed into lav* can be allocated any way you prefer,
-           as long as they're aligned enough for the architecture, and
-           they're freed appropriately (such as using av_free for buffers
-           allocated with av_malloc) */
-        video_outbuf_size = 2000000;
-        video_outbuf = (uint8_t*)av_malloc(video_outbuf_size);
     }
 
     // allocate the encoded raw picture
@@ -666,9 +656,7 @@ static void open_video(AVFormatContext *oc, AVStream *st)
 
 static void write_video_frame(AVFormatContext *oc, AVStream *st)
 {
-    int out_size, ret;
     AVCodecContext *c;
-
     c = st->codec;
 
     // Copy CD+G frame to a temporary frame object - tmp_picture
@@ -688,34 +676,22 @@ static void write_video_frame(AVFormatContext *oc, AVStream *st)
                       0, c->height, picture->data, picture->linesize);
 
     // Encode frame
-    out_size = avcodec_encode_video(c, video_outbuf, video_outbuf_size, picture);
-    // if zero size, it means the image was buffered
-    if (out_size > 0) {
-        AVPacket pkt;
-        av_init_packet(&pkt);
+    int got_packet = 0;
+    AVPacket pkt;
 
-        if (c->coded_frame && c->coded_frame->pts != (int64_t)AV_NOPTS_VALUE) {
-            pkt.pts = av_rescale_q(c->coded_frame->pts, c->time_base, st->time_base);
-        }
+    av_init_packet(&pkt);
+    pkt.data= NULL;
+    pkt.size= 0;
 
-        if(c->coded_frame->key_frame)
-            pkt.flags |= AV_PKT_FLAG_KEY;
-
-        pkt.stream_index= st->index;
-        pkt.data= video_outbuf;
-        pkt.size= out_size;
-
-        //av_pkt_dump(stderr, &pkt, 0);
+    if (avcodec_encode_video2(c, &pkt, picture, &got_packet) == 0 && got_packet == 1) {
         // write the compressed frame in the media file
-        ret = av_write_frame(oc, &pkt);
-    } else {
-        ret = 0;
-    }
+        if (write_frame(oc, &c->time_base, st, &pkt) < 0) {
+            fprintf(stderr, "Error while writing video frame\n");
+            exit(1);            
+        }
+    } 
 
-    if (ret != 0) {
-        fprintf(stderr, "Error while writing video frame\n");
-        exit(1);
-    }
+    av_free_packet(&pkt);
 }
 
 static void close_video(AVFormatContext *oc, AVStream *st)
@@ -723,11 +699,9 @@ static void close_video(AVFormatContext *oc, AVStream *st)
     avcodec_close(st->codec);
 
     av_free(picture->data[0]);
-    av_free(picture);
+    av_frame_free(&picture);
     av_free(tmp_picture->data[0]);
-    av_free(tmp_picture);
-
-    av_free(video_outbuf); 
+    av_frame_free(&tmp_picture);
 
     sws_freeContext(img_convert_ctx);
 }
