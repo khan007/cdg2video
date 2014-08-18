@@ -227,7 +227,7 @@ static AVStream *add_audio_stream(AVFormatContext *oc, AVCodecID codec_id)
     if (codec->channel_layouts) {
         c->channel_layout = codec->channel_layouts[0];
         for (int i = 0; codec->channel_layouts[i]; i++) {
-            if (codec->channel_layouts[i] == av_get_default_channel_layout(Options.audio_channels)) {
+            if (codec->channel_layouts[i] == (uint64_t)av_get_default_channel_layout(Options.audio_channels)) {
                 c->channel_layout = codec->channel_layouts[i];
                 break;
             }
