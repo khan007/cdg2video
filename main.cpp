@@ -768,7 +768,7 @@ static void write_video_frame(AVFormatContext *oc, AVStream *st)
 
     // As the CDG frame is RGB, convert it to the output color format and scale the image
     sws_scale(img_convert_ctx, tmp_picture->data, tmp_picture->linesize,
-                      0, c->height, picture->data, picture->linesize);
+                      0, CDG_FULL_HEIGHT, picture->data, picture->linesize);
 
     // Encode frame
     int got_packet = 0;
@@ -896,6 +896,18 @@ int cdg2avi(const char* avifile, const char* audiofile)
     // Set context options
     oc->packet_size = Options.packet_size;
     oc->max_delay = (int)(0.7 * AV_TIME_BASE);
+
+    // add meta data to the output file
+    av_dict_set(&oc->metadata, "encoded_by", PACKAGE " " VERSION, 0);
+    if (ic) {
+        AVDictionaryEntry *tag;
+
+        tag = av_dict_get(ic->metadata, "title", NULL, 0);
+        if (tag) av_dict_set(&oc->metadata, tag->key, tag->value, 0);
+
+        tag = av_dict_get(ic->metadata, "artist", NULL, 0);
+        if (tag) av_dict_set(&oc->metadata, tag->key, tag->value, 0);
+    }
 
     // write the stream header, if any
     avformat_write_header(oc, NULL);
