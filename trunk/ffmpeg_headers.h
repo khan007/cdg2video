@@ -13,7 +13,7 @@ extern "C" {
   #include "libavutil/imgutils.h"
   #include "libswresample/swresample.h"
   #include "libavutil/audio_fifo.h"
-
+  #include "libavformat/avio.h"
 }
 
 

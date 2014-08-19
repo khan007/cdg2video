@@ -33,7 +33,47 @@ int cdgio_write_packet(void *opaque, uint8_t *buf, int buf_size)
 int64_t cdgio_seek(void *opaque, int64_t offset, int whence)
 {
     CdgIoStream* pStream = (CdgIoStream*)opaque;
+
+    if (whence == AVSEEK_SIZE) {
+        // return the filesize without seeking anywhere
+        return pStream->getsize();
+    }
+
+    whence &= ~AVSEEK_FORCE;
     return pStream->seek((int)offset, whence);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+CdgIoStream::CdgIoStream()
+{
+    size_t buff_size = 4*1024;
+    uint8_t* buff = (uint8_t*)av_malloc(buff_size);
+
+    m_avio_ctx = avio_alloc_context(buff, 
+                                    buff_size,
+                                    0, 
+                                    this, 
+                                    cdgio_read_packet, 
+                                    cdgio_write_packet, 
+                                    cdgio_seek);
+
+    if (m_avio_ctx == NULL) {
+        if (buff) av_free(buff);
+    }
+}
+
+CdgIoStream::~CdgIoStream()
+{
+    if (m_avio_ctx) {
+        av_freep(&m_avio_ctx->buffer);
+        av_freep(&m_avio_ctx);      
+    }
+}
+
+AVIOContext* CdgIoStream::get_avio()
+{
+    return m_avio_ctx;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,6 +81,7 @@ int64_t cdgio_seek(void *opaque, int64_t offset, int whence)
 CdgFileIoStream::CdgFileIoStream()
 {
     m_file = NULL;
+    m_filename = NULL;
 }
 
 CdgFileIoStream::~CdgFileIoStream()
@@ -52,16 +93,21 @@ bool CdgFileIoStream::open(const char* file, const char* mode)
 {
     close();
     m_file = fopen(file, mode);
-    return (m_file != NULL);
+    if (m_file != NULL) {
+        m_filename = strdup(file);
+        return true;
+    }
+
+    return false;
 }
 
 void CdgFileIoStream::close()
 {
-    if (m_file) 
-    {
-        fclose(m_file);
-        m_file = NULL;
-    }
+    if (m_file) fclose(m_file);
+    if (m_filename) free(m_filename);
+        
+    m_file = NULL;
+    m_filename = NULL;
 }
 
 int CdgFileIoStream::read(void *buf, int buf_size)
@@ -96,6 +142,11 @@ int CdgFileIoStream::getsize()
     return 0;
 }
 
+const char* CdgFileIoStream::getfilename()
+{
+    return m_filename;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 CdgZipFileIoStream::CdgZipFileIoStream()
@@ -103,6 +154,7 @@ CdgZipFileIoStream::CdgZipFileIoStream()
     m_file = NULL;
     m_fileidx = -1;
     m_filesize = 0;
+    m_filename = NULL;
 }
 
 CdgZipFileIoStream::~CdgZipFileIoStream()
@@ -129,19 +181,23 @@ bool CdgZipFileIoStream::open(struct zip *archive, const char *fname)
     m_filesize = zs.size;
 
     m_file = zip_fopen_index(archive, m_fileidx, 0);
-    return m_file != NULL;
+    if (m_file != NULL) {
+        m_filename = strdup(fname);
+        return true;
+    }
+
+    return false;
 }
 
 void CdgZipFileIoStream::close()
 {
-    if (m_file)
-    {
-        zip_fclose(m_file);
-    }
+    if (m_file) zip_fclose(m_file);
+    if (m_filename) free(m_filename);
     
     m_file = NULL;
     m_fileidx = -1;
     m_filesize = 0;
+    m_filename = NULL;
 }
 
 int CdgZipFileIoStream::read(void *buf, int buf_size)
@@ -172,3 +228,7 @@ int CdgZipFileIoStream::getsize()
     return m_filesize;
 }
 
+const char* CdgZipFileIoStream::getfilename()
+{
+    return m_filename;
+}
