@@ -7,6 +7,5 @@
 /* Version number of package */
 #define VERSION "${VERSION}"
 
-#cmakedefine OLD_FFMPEG_INCLUDES
 
 #endif

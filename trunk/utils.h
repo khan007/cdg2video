@@ -29,6 +29,7 @@ typedef struct {
 } tVideoFrameSizeAbbr;
 
 char* get_audio_filename(const char* cdgfile);
+bool  is_supported_audio(const char* ext);
 int   get_frame_rate(int *frame_rate_num, int *frame_rate_den, const char *arg);
 int   get_frame_size(int *width_ptr, int *height_ptr, const char *str);
 int   get_aspect_ratio(AVRational *aspect_ratio, const char *arg);
