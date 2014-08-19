@@ -564,15 +564,18 @@ static int copy_audio_frame(AVFormatContext *ic, AVStream* is, AVFormatContext *
     return ret;
 }
  
-static AVStream* open_input_audio(const char* afile, AVFormatContext **ic)
+static AVStream* open_input_audio(CdgIoStream* pAudioStream, AVFormatContext **ic)
 {
     AVStream *st;
     int  audioStreamIdx;
 
-    *ic = NULL;
+    *ic = avformat_alloc_context();
+    if (*ic == NULL) return NULL;
+
+    (*ic)->pb = pAudioStream->get_avio();
 
     // Open audio file
-    if (avformat_open_input(ic, afile, NULL, NULL) != 0)
+    if (avformat_open_input(ic, NULL, NULL, NULL) != 0)
         return NULL; // Couldn't open file
 
     // Retrieve stream information
@@ -580,7 +583,7 @@ static AVStream* open_input_audio(const char* afile, AVFormatContext **ic)
         return NULL; // Couldn't find stream information
 
     // Dump information about file onto standard error
-    av_dump_format(*ic, 0, afile, false);
+    av_dump_format(*ic, 0, pAudioStream->getfilename(), false);
 
     // Find the first audio stream
     audioStreamIdx = -1;
@@ -801,7 +804,7 @@ static void close_video(AVFormatContext *oc, AVStream *st)
     sws_freeContext(img_convert_ctx);
 }
 
-int cdg2avi(const char* avifile, const char* audiofile)
+int cdg2avi(const char* avifile, CdgIoStream* pAudioStream)
 {
     AVFormatContext *oc = NULL;
     AVFormatContext *ic = NULL;
@@ -810,13 +813,13 @@ int cdg2avi(const char* avifile, const char* audiofile)
     AVStream *in_audio_st = NULL;
     bool copy_audio = false;
 
-    if (audiofile) {
-        in_audio_st = open_input_audio(audiofile, &ic);
+    if (pAudioStream) {
+        in_audio_st = open_input_audio(pAudioStream, &ic);
         if (in_audio_st == NULL) {
             if (ic == NULL)
-                fprintf(stderr, "WARNING: Unable to open audio file: %s\n", audiofile);
+                fprintf(stderr, "WARNING: Unable to allocate context for audio file: %s\n", pAudioStream->getfilename());
             else
-                fprintf(stderr, "WARNING: Unable to find input audio stream in %s\n", audiofile);
+                fprintf(stderr, "WARNING: Unable to find input audio stream in %s\n", pAudioStream->getfilename());
         }
     }
 
@@ -1220,7 +1223,7 @@ int main(int argc, char *argv[])
         }
         
         CdgIoStream* pCdgStream = NULL;
-        //CdgIoStream* pAudioStream = NULL;
+        CdgIoStream* pAudioStream = NULL;
 
         CdgFileIoStream cdgfilestream;
         CdgFileIoStream audiofilestream;
@@ -1270,8 +1273,13 @@ int main(int argc, char *argv[])
             // find corresponding audio file
             char* audiofile = get_audio_filename(argv[files]);
 
-            if (audiofile == NULL) {
-                fprintf(stderr, "WARNING: Can't find audio file (*.mp3)\n");
+            if (pAudioStream == NULL) {
+                if (audiofile != NULL && audiofilestream.open(audiofile, "r")) {
+                    pAudioStream = &audiofilestream;
+                }
+                else {
+                    fprintf(stderr, "WARNING: Can't find audio file (*.mp3)\n");
+                }
             }
 
             // generate avi file name
@@ -1298,7 +1306,7 @@ int main(int argc, char *argv[])
             }
 
             // perform actual conversion
-            cdg2avi(avifile, audiofile);
+            cdg2avi(avifile, pAudioStream);
 
             // free allocated memory
             free(avifile);

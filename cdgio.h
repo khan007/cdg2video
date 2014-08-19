@@ -21,15 +21,25 @@
 #include <inttypes.h>
 #include <zip.h>
 #include <stdio.h>
+#include "ffmpeg_headers.h"
 
 class CdgIoStream
 {
+public:
+    CdgIoStream();
+    virtual ~CdgIoStream();
+    AVIOContext* get_avio();
+
 public:
     virtual int read(void *buf, int buf_size) = 0;
     virtual int write(const void *buf, int buf_size) = 0;
     virtual int seek(int offset, int whence) = 0;
     virtual int eof() = 0;
     virtual int getsize() = 0;
+    virtual const char* getfilename() = 0;
+
+protected:
+    AVIOContext *m_avio_ctx;
 };
 
 class CdgFileIoStream : public CdgIoStream
@@ -45,9 +55,11 @@ public:
     virtual int seek(int offset, int whence);
     virtual int eof();
     virtual int getsize();
+    virtual const char* getfilename();
       
 protected:
     FILE*  m_file;
+    char*  m_filename;
 };
 
 class CdgZipFileIoStream : public CdgIoStream
@@ -63,11 +75,13 @@ public:
     virtual int seek(int offset, int whence);
     virtual int eof();
     virtual int getsize();
+    virtual const char* getfilename();
       
 protected:
     struct zip_file* m_file;
     int m_fileidx;
     int m_filesize;
+    char*  m_filename;
 };
 
 int cdgio_read_packet(void *opaque, uint8_t *buf, int buf_size);
