@@ -84,6 +84,16 @@ char* get_audio_filename(const char* cdgfile)
     return NULL;
 }
 
+bool is_supported_audio(const char* ext)
+{
+    for (int i = 0; audio_files[i] != NULL; i++) 
+    {
+        if (strcasecmp(ext, audio_files[i]) == 0) return true;
+    }
+
+    return false;
+}
+
 int get_frame_rate(int *frame_rate_num, int *frame_rate_den, const char *arg)
 {
     int i = 0;

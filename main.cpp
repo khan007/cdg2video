@@ -1228,6 +1228,7 @@ int main(int argc, char *argv[])
         CdgFileIoStream cdgfilestream;
         CdgFileIoStream audiofilestream;
         CdgZipFileIoStream cdgzipstream;
+        CdgZipFileIoStream audiozipstream;
         
         if (extcdg && cdgfilestream.open(argv[files], "r"))
         {
@@ -1248,17 +1249,26 @@ int main(int argc, char *argv[])
                 do 
                 {
                     filename = zip_get_name(zipfile, cdgidx++, 0);
-                    if (filename)
+                    if (filename) 
                     {
                         const char* p = strrchr(filename, '.');
-                        if (p && strcasecmp(p+1, "cdg") == 0) break;
+                        if (p) 
+                        {
+                            if (pCdgStream == NULL && strcasecmp(p+1, "cdg") == 0 && 
+                                cdgzipstream.open(zipfile, filename)) 
+                            {
+                                pCdgStream = &cdgzipstream;
+                            }
+                            else
+                            if (pAudioStream == NULL && is_supported_audio(p+1) &&
+                                audiozipstream.open(zipfile, filename))
+                            {
+                                pAudioStream = &audiozipstream;
+                            }
+                        }
                     }
-                } while (filename);
+                } while (filename && (pCdgStream == NULL || pAudioStream == NULL));
                 
-                if (filename && cdgzipstream.open(zipfile, filename))
-                {
-                    pCdgStream = &cdgzipstream;
-                }
             }
             else 
             {
@@ -1318,6 +1328,7 @@ int main(int argc, char *argv[])
         }
         
         cdgzipstream.close();
+        audiozipstream.close();
         if (zipfile) zip_close(zipfile);
     }
 
