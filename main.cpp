@@ -122,7 +122,6 @@ static VideoFrameSurface frameSurface;
 static AVFrame *picture, *tmp_picture;
 static struct SwsContext *img_convert_ctx;
 
-
 static AVAudioFifo *audio_fifo;
 static SwrContext *audio_resample_ctx; 
 
@@ -250,6 +249,8 @@ static AVStream *add_audio_stream(AVFormatContext *oc, AVCodecID codec_id)
             }
         }
     }
+
+    st->time_base = (AVRational){1, c->sample_rate};
 
     if (oc->oformat->flags & AVFMT_GLOBALHEADER) 
         c->flags |= CODEC_FLAG_GLOBAL_HEADER;
@@ -544,19 +545,7 @@ static int copy_audio_frame(AVFormatContext *ic, AVStream* is, AVFormatContext *
     ret = av_read_frame(ic, &pkt);
 
     if (ret == 0) {
-
-        // convert paket pts and dts from input time base to the output time base
-        if (pkt.pts != (int64_t)AV_NOPTS_VALUE)
-            pkt.pts = av_rescale_q(pkt.pts, is->time_base, os->time_base);
-
-        if (pkt.dts != (int64_t)AV_NOPTS_VALUE)
-            pkt.dts = av_rescale_q(pkt.dts, is->time_base, os->time_base);
-
-        pkt.flags |= AV_PKT_FLAG_KEY;
-        pkt.stream_index= os->index;
-
-        //av_pkt_dump(stderr, &pkt, 0);
-        av_write_frame(oc, &pkt);
+        write_frame(oc, &is->time_base, os, &pkt);
         av_free_packet(&pkt);   
 
     }
@@ -660,8 +649,8 @@ static AVStream *add_video_stream(AVFormatContext *oc, AVCodecID codec_id)
     // of which frame timestamps are represented. for fixed-fps content,
     // timebase should be 1/framerate and timestamp increments should be
     // identically 1.
-    c->time_base.den = Options.frame_rate.num;
-    c->time_base.num = Options.frame_rate.den;
+    st->time_base = (AVRational){Options.frame_rate.den, Options.frame_rate.num};
+    c->time_base = st->time_base;
 
     //c->sample_aspect_ratio = av_d2q(frame_aspect_ratio*c->height/c->width, 255);
 
