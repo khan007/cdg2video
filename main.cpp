@@ -537,7 +537,10 @@ static int copy_audio_frame(AVFormatContext *ic, AVStream* is, AVFormatContext *
 {
     int ret;
     AVPacket pkt;
+
     av_init_packet(&pkt); 
+    pkt.data = NULL;
+    pkt.size = 0;
 
     if (!ic || !is || !oc || !os) 
         return 1;
@@ -547,7 +550,6 @@ static int copy_audio_frame(AVFormatContext *ic, AVStream* is, AVFormatContext *
     if (ret == 0) {
         write_frame(oc, &is->time_base, os, &pkt);
         av_free_packet(&pkt);   
-
     }
 
     return ret;
@@ -656,10 +658,10 @@ static AVStream *add_video_stream(AVFormatContext *oc, AVCodecID codec_id)
 
     c->gop_size = 12; // emit one intra frame every twelve frames at most
 
-    if (c->codec_id == CODEC_ID_MPEG2VIDEO) {
+    if (c->codec_id == AV_CODEC_ID_MPEG2VIDEO) {
     }
 
-    if (c->codec_id == CODEC_ID_MPEG1VIDEO){
+    if (c->codec_id == AV_CODEC_ID_MPEG1VIDEO){
         // Needed to avoid using macroblocks in which some coeffs overflow.
         // This does not happen with normal video, it just happens here as
         // the motion of the chroma plane does not match the luma plane.
@@ -822,11 +824,11 @@ int cdg2avi(const char* avifile, CdgIoStream* pAudioStream)
     oc->oformat = Options.format;
     snprintf(oc->filename, sizeof(oc->filename), "%s", avifile);
 
-    if (Options.format->video_codec != CODEC_ID_NONE) {
+    if (Options.format->video_codec != AV_CODEC_ID_NONE) {
         video_st = add_video_stream(oc, Options.format->video_codec);
     }
 
-    if (in_audio_st && Options.format->audio_codec != CODEC_ID_NONE) 
+    if (in_audio_st && Options.format->audio_codec != AV_CODEC_ID_NONE) 
     {
         if (Options.format->audio_codec == in_audio_st->codec->codec_id) {
             copy_audio = true;
@@ -974,18 +976,18 @@ static void set_audio_codec_defaults()
 
     switch(Options.format->audio_codec)
     {
-    case CODEC_ID_AMR_NB:
+    case AV_CODEC_ID_AMR_NB:
         Options.audio_bit_rate      = 12200;
         Options.audio_sample_rate   = 8000;
         Options.audio_channels      = 1;
         break;
-    case CODEC_ID_AMR_WB:
+    case AV_CODEC_ID_AMR_WB:
         Options.audio_bit_rate      = 23850;
         Options.audio_sample_rate   = 16000;
         Options.audio_channels      = 1;
         break;
 
-    //case CODEC_ID_AC3:
+    //case AV_CODEC_ID_AC3:
     //    Options.audio_bit_rate      = 192000;
     //    Options.audio_sample_rate   = 48000;
     //    Options.audio_channels      = 2;
@@ -1074,10 +1076,10 @@ int main(int argc, char *argv[])
     // set default output format - xvid avi with mp3 audio
     Options.format = av_guess_format("avi", NULL, NULL);
     if (Options.format) {
-        //if (avcodec_find_encoder(CODEC_ID_XVID)) 
-        //    Options.format->video_codec = CODEC_ID_XVID;
-        if (avcodec_find_encoder(CODEC_ID_MP3))  
-            Options.format->audio_codec = CODEC_ID_MP3;
+        //if (avcodec_find_encoder(AV_CODEC_ID_XVID)) 
+        //    Options.format->video_codec = AV_CODEC_ID_XVID;
+        if (avcodec_find_encoder(AV_CODEC_ID_MP3))  
+            Options.format->audio_codec = AV_CODEC_ID_MP3;
     }
 
     // parse command line options
@@ -1187,8 +1189,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    if ((Options.format->video_codec == CODEC_ID_NONE) ||
-        (Options.format->audio_codec == CODEC_ID_NONE))
+    if ((Options.format->video_codec == AV_CODEC_ID_NONE) ||
+        (Options.format->audio_codec == AV_CODEC_ID_NONE))
     {
         fprintf(stderr, "Could not find suitable output format\n");
         return 1;
