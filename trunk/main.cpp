@@ -476,11 +476,12 @@ static int init_output_frame(AVFrame **frame,
 
 static int encode_audio_from_fifo(AVAudioFifo *fifo,
                                  AVFormatContext *oc,
-                                 AVStream *os)
+                                 AVStream *os, 
+                                 int nb_samples)
 {
     AVFrame *output_frame;
     int data_written;
-    const int frame_size = FFMIN(av_audio_fifo_size(fifo), os->codec->frame_size);
+    const int frame_size = FFMIN(av_audio_fifo_size(fifo), nb_samples);
 
     if (init_output_frame(&output_frame, os->codec, frame_size))
         return AVERROR_EXIT;
@@ -509,15 +510,21 @@ static int write_audio_frame(AVFormatContext *ic, AVStream* is, AVFormatContext 
     int finished = 0;
     int ret = decode_audio_frame(ic, is, os, &finished);
 
-    while (av_audio_fifo_size(audio_fifo) >= os->codec->frame_size || 
+    int nb_samples = os->codec->frame_size;
+    if (os->codec->codec->capabilities & CODEC_CAP_VARIABLE_FRAME_SIZE) {
+        nb_samples = av_audio_fifo_size(audio_fifo);
+        if (nb_samples <= 0) nb_samples = 1;
+    }
+
+    while (av_audio_fifo_size(audio_fifo) >= nb_samples || 
             (finished && av_audio_fifo_size(audio_fifo) > 0))
     {
-        if (encode_audio_from_fifo(audio_fifo, oc, os)) break;
+        if (encode_audio_from_fifo(audio_fifo, oc, os, nb_samples)) break;
     }
 
     if (finished) {
         // Flush the encoder as it may have delayed frames.
-        int data_written;
+        int data_written = 0;
         do {
             if (encode_audio_frame(NULL, oc, os, &data_written)) break;
         } while (data_written);        
